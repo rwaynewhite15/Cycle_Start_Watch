@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+*.csv
+!hardware/**/*.csv
+!firmware/partitions.csv
