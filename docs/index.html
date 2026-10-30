@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cycle Start Watch</title>
+<meta name="description" content="A read-only Bluetooth logger that watches a CNC machine's cycle start lamp and records when the machine is in cycle, collected by a Raspberry Pi gateway.">
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #eef1f4;
+    --text: #1b2430;
+    --muted: #5a6675;
+    --line: #d8dee5;
+    --accent: #1f6feb;
+    --run: #1a7f37;
+    --stop: #c62828;
+    --blink: #b26a00;
+    --off: #8a94a3;
+    --code-bg: #eef1f4;
+    --hero-bg: #1b2430;
+    --hero-text: #f3f5f7;
+    --hero-muted: #b7c0cb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f141a;
+      --surface: #161d25;
+      --surface-2: #1d2630;
+      --text: #e6eaef;
+      --muted: #9aa6b4;
+      --line: #2a3542;
+      --accent: #58a6ff;
+      --run: #3fb950;
+      --stop: #f26d6d;
+      --blink: #e3a33b;
+      --off: #8a94a3;
+      --code-bg: #1d2630;
+      --hero-bg: #0a0e13;
+      --hero-text: #f3f5f7;
+      --hero-muted: #9aa6b4;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f141a; --surface: #161d25; --surface-2: #1d2630; --text: #e6eaef; --muted: #9aa6b4;
+    --line: #2a3542; --accent: #58a6ff; --run: #3fb950; --stop: #f26d6d; --blink: #e3a33b;
+    --off: #8a94a3; --code-bg: #1d2630; --hero-bg: #0a0e13; --hero-text: #f3f5f7; --hero-muted: #9aa6b4;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  a { color: var(--accent); }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88em; }
+  code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; }
+  pre { background: var(--code-bg); padding: 14px 16px; border-radius: 8px; overflow-x: auto; line-height: 1.45; }
+  pre code { background: none; padding: 0; }
+
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+  section { padding: 48px 0; border-bottom: 1px solid var(--line); }
+  h1, h2, h3 { line-height: 1.25; }
+  h2 { font-size: 1.6rem; margin: 0 0 8px; }
+  h3 { font-size: 1.1rem; margin: 0 0 6px; }
+  .lede { color: var(--muted); margin: 0 0 24px; max-width: 70ch; }
+
+  /* hero */
+  header.hero { background: var(--hero-bg); color: var(--hero-text); padding: 56px 0 48px; }
+  .hero h1 { font-size: clamp(2rem, 5vw, 3rem); margin: 0 0 12px; letter-spacing: -0.02em; }
+  .hero p { color: var(--hero-muted); font-size: 1.15rem; max-width: 62ch; margin: 0 0 24px; }
+  .lamp-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 28px; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
+          border: 1px solid rgba(255,255,255,0.18); font-size: 0.9rem; color: var(--hero-text); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .btns { display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn { display: inline-block; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+  .btn.primary { background: #58a6ff; color: #0a0e13; }
+  .btn.ghost { border: 1px solid rgba(255,255,255,0.3); color: var(--hero-text); }
+
+  /* grids & cards */
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+  .num { font-size: 2rem; font-weight: 700; line-height: 1.1; }
+
+  /* diagram */
+  .diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px; overflow-x: auto; }
+  .diagram svg { display: block; width: 100%; min-width: 640px; height: auto; }
+  .diagram text { font-family: inherit; }
+
+  /* tables */
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; font-size: 0.95rem; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .tag { font-weight: 600; white-space: nowrap; }
+  .tag.run { color: var(--run); } .tag.stop { color: var(--stop); } .tag.blink { color: var(--blink); }
+
+  /* steps */
+  ol.steps { counter-reset: s; list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+  ol.steps li { counter-increment: s; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px 14px 56px; position: relative; }
+  ol.steps li::before { content: counter(s); position: absolute; left: 16px; top: 14px; width: 28px; height: 28px; border-radius: 50%;
+                        background: var(--accent); color: #fff; font-weight: 700; display: grid; place-items: center; font-size: 0.9rem; }
+
+  /* status */
+  .status li { margin: 4px 0; }
+  .done::marker { content: "✓  "; color: var(--run); }
+  .next::marker { content: "→  "; color: var(--accent); }
+  .later::marker { content: "○  "; color: var(--off); }
+
+  footer { padding: 32px 0 48px; color: var(--muted); font-size: 0.9rem; }
+  .two { display: grid; gap: 24px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); align-items: start; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>Cycle Start Watch</h1>
+    <p>A small, read-only Bluetooth logger for Fanuc, Okuma and Mori Seiki CNCs. It watches the
+      cycle start lamp, records exactly when each machine is in cycle, and a Raspberry Pi
+      gateway collects everything into one database. No ladder changes, no network, about
+      an hour to install.</p>
+    <div class="lamp-row" aria-label="States the device records">
+      <span class="pill"><span class="dot" style="background:#3fb950"></span>RUN: lamp on</span>
+      <span class="pill"><span class="dot" style="background:#f26d6d"></span>STOP: lamp off</span>
+      <span class="pill"><span class="dot" style="background:#e3a33b"></span>BLINK: lamp flashing</span>
+      <span class="pill"><span class="dot" style="background:#8a94a3"></span>OFF: machine unpowered</span>
+    </div>
+    <div class="btns">
+      <a class="btn primary" href="https://github.com/rwaynewhite15/Cycle_Start_Watch">View the code</a>
+      <a class="btn ghost" href="#docs">Read the docs</a>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<section>
+  <div class="wrap">
+    <h2>What it measures</h2>
+    <p class="lede">The share of scheduled time each machine spends <strong>in cycle</strong>, shift by
+      shift, plus every stop with its length. It is deliberately called <em>in-cycle %</em> rather than
+      uptime or OEE availability: it knows when the control is executing a program, not why a
+      machine stopped or how many good parts it made.</p>
+    <div class="grid">
+      <div class="card"><div class="num">4</div><h3>wires</h3><p>Two across the lamp, two for 24 VDC power. All in parallel with existing wiring; nothing is cut.</p></div>
+      <div class="card"><div class="num">0</div><h3>ladder changes</h3><p>No PMC, parameter or program edits. A controls engineer only reads the drawings.</p></div>
+      <div class="card"><div class="num">ms</div><h3>timestamps</h3><p>Each RUN/STOP change is logged in UTC to the millisecond, from a battery-backed clock.</p></div>
+      <div class="card"><div class="num">5 min</div><h3>collection</h3><p>A Raspberry Pi syncs every device in Bluetooth range every five minutes. No plant network needed.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p class="lede">The device senses the lamp through an optocoupler, logs state changes to flash,
+      and serves them over Bluetooth Low Energy. The gateway pulls them into SQLite. Data leaves the
+      Pi on a USB stick or a laptop cable.</p>
+    <div class="diagram">
+      <svg viewBox="0 0 900 300" role="img" aria-labelledby="dtitle">
+        <title id="dtitle">Data path: CNC cycle start lamp, through an optocoupler, to the ESP32 device, over Bluetooth to a Raspberry Pi gateway with SQLite, and out by USB stick or laptop.</title>
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/>
+          </marker>
+        </defs>
+        <!-- zones -->
+        <rect x="10" y="20" width="250" height="260" rx="10" fill="var(--surface-2)" stroke="var(--line)"/>
+        <text x="24" y="44" font-size="13" font-weight="600" fill="var(--muted)">MACHINE CABINET</text>
+        <rect x="290" y="20" width="250" height="260" rx="10" fill="var(--surface-2)" stroke="var(--line)"/>
+        <text x="304" y="44" font-size="13" font-weight="600" fill="var(--muted)">DEVICE (outside cabinet)</text>
+        <rect x="610" y="20" width="280" height="260" rx="10" fill="var(--surface-2)" stroke="var(--line)"/>
+        <text x="624" y="44" font-size="13" font-weight="600" fill="var(--muted)">GATEWAY (one per area)</text>
+
+        <!-- machine side -->
+        <rect x="30" y="64" width="210" height="62" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+        <circle cx="56" cy="95" r="12" fill="var(--run)"/>
+        <text x="78" y="91" font-size="15" font-weight="600" fill="var(--text)">Cycle start lamp</text>
+        <text x="78" y="110" font-size="12" fill="var(--muted)">Fanuc STL (F0.5), 24 V</text>
+        <rect x="30" y="180" width="210" height="62" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+        <text x="46" y="207" font-size="15" font-weight="600" fill="var(--text)">24 VDC control supply</text>
+        <text x="46" y="226" font-size="12" fill="var(--muted)">fused tap, 0.5 A</text>
+
+        <!-- device -->
+        <rect x="310" y="64" width="210" height="62" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+        <text x="326" y="91" font-size="15" font-weight="600" fill="var(--text)">Optocoupler</text>
+        <text x="326" y="110" font-size="12" fill="var(--muted)">light-only link, input only</text>
+        <rect x="310" y="150" width="210" height="110" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+        <text x="326" y="177" font-size="15" font-weight="600" fill="var(--text)">ESP32 + DS3231 clock</text>
+        <text x="326" y="198" font-size="12" fill="var(--muted)">filter: stretch, debounce, settle</text>
+        <text x="326" y="216" font-size="12" fill="var(--muted)">32,768-record log in flash</text>
+        <text x="326" y="234" font-size="12" fill="var(--muted)">passkey-protected BLE</text>
+
+        <!-- gateway -->
+        <rect x="630" y="64" width="240" height="88" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+        <text x="646" y="91" font-size="15" font-weight="600" fill="var(--text)">Raspberry Pi</text>
+        <text x="646" y="112" font-size="12" fill="var(--muted)">syncs every device every 5 min</text>
+        <text x="646" y="130" font-size="12" fill="var(--muted)">RTC HAT keeps time offline</text>
+        <rect x="630" y="172" width="240" height="88" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+        <text x="646" y="199" font-size="15" font-weight="600" fill="var(--text)">SQLite database</text>
+        <text x="646" y="220" font-size="12" fill="var(--muted)">shift reports, CSV export</text>
+        <text x="646" y="238" font-size="12" fill="var(--muted)">out by USB stick / laptop</text>
+
+        <!-- arrows -->
+        <line x1="240" y1="95" x2="306" y2="95" stroke="var(--muted)" stroke-width="2" marker-end="url(#arr)"/>
+        <line x1="240" y1="211" x2="306" y2="211" stroke="var(--muted)" stroke-width="2" marker-end="url(#arr)"/>
+        <line x1="415" y1="126" x2="415" y2="146" stroke="var(--muted)" stroke-width="2" marker-end="url(#arr)"/>
+        <path d="M520 190 C 570 190, 580 108, 626 108" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="6 5" marker-end="url(#arr)"/>
+        <text x="548" y="168" font-size="12" font-weight="600" fill="var(--accent)">BLE</text>
+        <line x1="750" y1="152" x2="750" y2="168" stroke="var(--muted)" stroke-width="2" marker-end="url(#arr)"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap two">
+    <div>
+      <h2>Read-only by design</h2>
+      <p class="lede">The device cannot start a machine or block a start, and that is guaranteed by
+        the hardware, not just the software.</p>
+      <ul>
+        <li><strong>Input only.</strong> The only connection to the machine's signals is the LED side of an
+          optocoupler. No relay or output is wired toward the machine.</li>
+        <li><strong>Parallel tap.</strong> New conductors land beside the existing lamp wires. Nothing is
+          disconnected or rerouted.</li>
+        <li><strong>Single-fault safe.</strong> Two series resistors limit the draw to about 7 mA (under 20 mA
+          if one fails shorted), with a 63 mA fuse at the tap.</li>
+        <li><strong>Isolated power.</strong> An isolated DC-DC converter keeps the device's ground separate
+          from the machine's 0 V.</li>
+        <li><strong>Fully reversible.</strong> Pull two fuses, remove four wires, and the machine is as it was.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Why the lamp?</h2>
+      <p class="lede">The button's contacts only say a start was <em>pressed</em>. The lamp follows the
+        control's "in cycle" signal, so it gives run time.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Machine state</th><th>Lamp</th></tr></thead>
+          <tbody>
+            <tr><td>Program running (incl. waiting on M-code, bar feeder)</td><td><span class="tag run">ON</span></td></tr>
+            <tr><td>Feed hold</td><td><span class="tag stop">OFF</span></td></tr>
+            <tr><td>Alarm, reset, E-stop</td><td><span class="tag stop">OFF</span></td></tr>
+            <tr><td>M00 / M01, M30 end</td><td><span class="tag stop">OFF</span></td></tr>
+            <tr><td>Some builders, in feed hold</td><td><span class="tag blink">FLASHING</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="color:var(--muted);font-size:0.9rem">Lamp behaviour comes from the machine builder's ladder, so each
+        model is surveyed before install. Fallback signal: the green stack light.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>A filter built for real lamps</h2>
+    <p class="lede">A plain 200 ms debounce assumes a clean DC signal. Real lamps are messier, so the firmware
+      cleans the signal in three stages. All three are unit-tested on a PC.</p>
+    <div class="grid">
+      <div class="card"><h3>1 · Pulse stretch</h3><p>AC lamps and PWM-dimmed LEDs switch the opto on and off
+        hundreds of times a second. Any "on" in the last 25 ms counts as on.</p></div>
+      <div class="card"><h3>2 · Debounce, 200 ms</h3><p>Ignores glitches: noise from spindle drives, contact
+        bounce, a lamp-test flash.</p></div>
+      <div class="card"><h3>3 · Settle + blink</h3><p>A change is logged once it has held for 1.5 s, and
+        back-dated to when it began. A lamp that keeps flashing is logged as BLINK, not hundreds of RUN/STOP records.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap two">
+    <div>
+      <h2>The gateway</h2>
+      <p class="lede">One Raspberry Pi per area of about 6–10 machines. No plant network: it keeps time
+        with a battery clock and sets every device's clock on each sync.</p>
+      <ul>
+        <li>Downloads only new records; storing the same record twice is harmless.</li>
+        <li>Logs every sync, including any records lost before collection.</li>
+        <li>Shift reports handle overnight shifts and daylight-saving changes.</li>
+        <li>Plain SQLite: query it directly or open it in DB Browser or Excel.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Example: <code>csw_gateway.py report</code></h3>
+<pre><code>OKUMA-LB-07 (AA:BB:CC:DD:EE:01)
+  shift start      shift in-cycle   stop    off
+  Wed 10-28 23:00  C        76.9%  23.1%   0.0%
+  Thu 10-29 06:00  A        76.9%  23.1%   0.0%
+  Thu 10-29 14:30  B        76.9%  23.0%   0.0%</code></pre>
+      <p style="color:var(--muted);font-size:0.9rem">Columns for "no data" and the longest stop are trimmed
+        here for width.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Installing one machine</h2>
+    <p class="lede">About an hour for a qualified electrician, after a one-time survey per machine model.</p>
+    <ol class="steps">
+      <li><strong>Survey.</strong> Watch the lamp through each machine state and find its terminals on the drawings.</li>
+      <li><strong>Lock out.</strong> Plant LOTO procedure; the cabinet carries 480 VAC.</li>
+      <li><strong>Wire four conductors.</strong> Lamp A through a 63 mA fused terminal, lamp B, +24 V through a 0.5 A fuse, and 0 V.</li>
+      <li><strong>Mount the device</strong> outside the steel cabinet so Bluetooth can get out.</li>
+      <li><strong>Test.</strong> Run, feed hold, M30. Confirm cycle start still works and no alarms appear.</li>
+      <li><strong>Pair with the gateway</strong> using the passkey on the device label.</li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <div class="wrap two">
+    <div>
+      <h2>Status</h2>
+      <ul class="status">
+        <li class="done">Firmware builds for ESP32-C3 and ESP32-S3 in CI</li>
+        <li class="done">Input filter unit tests pass</li>
+        <li class="done">Gateway tested against a simulated device</li>
+        <li class="done">Install guide and plant sign-off checklist written</li>
+        <li class="next">Bench test on real hardware</li>
+        <li class="next">Pilot install on one machine</li>
+        <li class="later">Phone app for setup and spot checks</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Phase 2</h2>
+      <p class="lede" style="margin-bottom:12px">Why a machine stopped, not just when: program, N number,
+        tool and alarm at each stop.</p>
+      <ul>
+        <li><strong>Fanuc / Mori Seiki:</strong> FOCAS2 over the control's Ethernet port.</li>
+        <li><strong>Okuma:</strong> MTConnect or THINC API.</li>
+        <li>Runs on the same gateway Pi, connected to each machine's own Ethernet port.
+          The lamp input stays as a backup.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="docs">
+  <div class="wrap">
+    <h2>Documentation</h2>
+    <div class="grid">
+      <a class="card" href="design.html" style="text-decoration:none"><h3>Design notes</h3><p>The reasoning behind every decision, risks, and phase 2.</p></a>
+      <a class="card" href="install-guide.html" style="text-decoration:none"><h3>Install guide</h3><p>Step by step for the electrician, with the install record.</p></a>
+      <a class="card" href="plant-signoff-checklist.html" style="text-decoration:none"><h3>Plant sign-off</h3><p>Approvals from controls, EHS, quality, IT and production.</p></a>
+      <a class="card" href="bench-test-plan.html" style="text-decoration:none"><h3>Bench test plan</h3><p>Prove it on the bench with a switch and a 24 V supply.</p></a>
+      <a class="card" href="ble-protocol.html" style="text-decoration:none"><h3>BLE protocol</h3><p>Byte-level interface for the gateway and app.</p></a>
+      <a class="card" href="https://github.com/rwaynewhite15/Cycle_Start_Watch/blob/main/hardware/README.md" style="text-decoration:none"><h3>Hardware</h3><p>Schematic, parts list and component calculations.</p></a>
+      <a class="card" href="https://github.com/rwaynewhite15/Cycle_Start_Watch/blob/main/gateway/README.md" style="text-decoration:none"><h3>Gateway setup</h3><p>Raspberry Pi, pairing, RTC, reports, getting data off.</p></a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    Cycle Start Watch · <a href="https://github.com/rwaynewhite15/Cycle_Start_Watch">source on GitHub</a>
+  </div>
+</footer>
+
+</body>
+</html>

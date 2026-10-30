@@ -11,7 +11,7 @@ and before writing the app.
 | Item | Notes |
 |---|---|
 | ESP32-C3-DevKitM-1 (or S3-DevKitC-1) + USB cable | |
-| Input circuit on a breadboard or perfboard | R1, R2, R4, PC814, R3, C1 from [hardware/README.md](../hardware/README.md) |
+| Input circuit on a breadboard or perfboard | R1, R2, R4, PC814, R3, C1 from [hardware/README.md](https://github.com/rwaynewhite15/Cycle_Start_Watch/blob/main/hardware/README.md) |
 | DS3231 breakout + coin cell | |
 | 24 VDC bench supply or DIN-rail supply, with current limit set to about 0.5 A | |
 | Toggle switch + a 24 V pilot lamp (an LED type if you have one) | Stands in for the PMC output + cycle start lamp |
@@ -98,7 +98,7 @@ Use `python tools/csw_client.py watch --device CSW-xxxx`, or just the serial log
 
 ## G. Raspberry Pi gateway
 
-Set up the Pi as described in [gateway/README.md](../gateway/README.md) and
+Set up the Pi as described in [gateway/README.md](https://github.com/rwaynewhite15/Cycle_Start_Watch/blob/main/gateway/README.md) and
 pair it with the bench device.
 
 | # | Step | Expected | Result |
@@ -108,7 +108,7 @@ pair it with the bench device.
 | G3 | Connect with nRF Connect between passes | Phone connects; the gateway's next pass still succeeds | |
 | G4 | Unplug the bench device for 2 passes | `sync_log` shows "not seen in this scan"; nothing breaks; the next pass catches up | |
 | G5 | Unpair (BOOT held 5 s), run a pass | Fails with "is this device paired"; after re-pairing, it catches up with no gaps | |
-| G6 | Pi offline (Wi-Fi off) and rebooted, no RTC HAT | Gateway does **not** set the device clock (`set_device_clock = "ntp"`) | |
+| G6 | Pi offline, unplugged overnight, then powered back up | `date` on the Pi is still correct (RTC HAT working); device clocks stay within ±1 s of a phone | |
 | G7 | `report --days 1` after the F2 soak test | In-cycle % matches the timer's duty cycle within 0.5% | |
 
 ## Pass criteria before going near a machine

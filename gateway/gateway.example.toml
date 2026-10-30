@@ -5,9 +5,12 @@ interval_s = 300                       # how often to sync every device
 scan_s = 10
 connect_timeout_s = 20
 
-# Set device clocks from the Pi only when the Pi is NTP-synchronized.
-# "always" if you fitted an RTC HAT and trust it; "never" to leave device clocks alone.
-set_device_clock = "ntp"
+# This plant has no network, so the Pi keeps time with an RTC HAT (see
+# README "Clock") and sets the device clocks from it on every sync.
+#   "always" = trust the Pi's clock (requires the RTC HAT, set once)
+#   "ntp"    = only when the Pi is NTP-synchronized (needs a network)
+#   "never"  = leave device clocks alone
+set_device_clock = "always"
 
 # Empty = collect every Cycle Start Watch in range (fine for a pilot).
 # For production list the MAC addresses, so a unit from another area is ignored.

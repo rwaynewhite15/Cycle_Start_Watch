@@ -56,7 +56,7 @@ So lamp ON ≈ "the control is in cycle". That is the number you want.
 
 ## 2. The input circuit
 
-See [hardware/README.md](../hardware/README.md) for the schematic and the
+See [hardware/README.md](https://github.com/rwaynewhite15/Cycle_Start_Watch/blob/main/hardware/README.md) for the schematic and the
 calculations. The main choices:
 
 * **Bidirectional-LED optocoupler (PC814 or equivalent).** It works with AC
@@ -185,18 +185,20 @@ loss on the list.
 Phone-only sync has two problems: data arrives only when someone walks the
 floor, and a busy machine's log wraps after about 11 days. A Raspberry Pi
 per area syncs every device in range every 5 minutes into SQLite. See
-[gateway/README.md](../gateway/README.md).
+[gateway/README.md](https://github.com/rwaynewhite15/Cycle_Start_Watch/blob/main/gateway/README.md).
 
 * **Python + `bleak`**, the same library as the bench client, so the sync
   logic is tested once and reused. SQLite because the data is small (about
   1 MB per machine per year) and you can query it directly.
 * **One connection at a time, a few seconds each.** The device only accepts
   one client, so a phone still gets in between passes.
-* **The Pi only sets device clocks when its own clock is NTP-synced.** A Pi
-  has no battery clock. After an offline reboot it could otherwise push a
-  wrong time to every device. Offline sites fit an RTC HAT.
-* **No network required to collect.** Network access (for NTP, remote
-  queries or a dashboard) is a separate IT/OT decision.
+* **No plant network, so the Pi has an RTC HAT.** A bare Pi has no battery
+  clock. After a reboot it could push a wrong time to every device. With a
+  DS3231 HAT, set once from a laptop, the Pi is the plant's time source for
+  its devices. (On a networked site, `set_device_clock = "ntp"` would use NTP
+  instead.)
+* **Fully offline.** Data leaves the Pi on a USB stick or over a laptop
+  plugged straight into it with an Ethernet cable.
 * **Pairing:** each device is paired with the Pi once, with `bluetoothctl`
   and the passkey from its label.
 
@@ -208,7 +210,7 @@ per area syncs every device in range every 5 minutes into SQLite. See
 * **The phone holds the raw events.** The app derives intervals and reports
   from them, so a change to the shift calendar recomputes history.
 * The schema and an example in-cycle-by-shift query are in
-  [app/README.md](../app/README.md).
+  [app/README.md](https://github.com/rwaynewhite15/Cycle_Start_Watch/blob/main/app/README.md).
 
 ## 10. Open risks
 

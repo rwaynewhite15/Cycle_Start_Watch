@@ -1,0 +1,6 @@
+# GitHub Pages (Settings > Pages > Deploy from a branch: main, /docs).
+# index.html is the hand-written landing page; the .md docs are rendered
+# with this theme.
+title: Cycle Start Watch
+description: Read-only CNC in-cycle logger with a Raspberry Pi gateway
+theme: jekyll-theme-minimal

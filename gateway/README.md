@@ -35,7 +35,7 @@ the rest of the time (the device accepts one connection at a time).
 | Raspberry Pi 4 or 5, 2 GB is plenty | Built-in Bluetooth works. A USB Bluetooth adapter with an external antenna improves range on a busy floor |
 | Storage: **USB SSD** (recommended) or an industrial-grade microSD card | Cheap SD cards wear out and corrupt on power cuts |
 | Official power supply, ideally on a small UPS or a UPS HAT | Avoids SD corruption when the area loses power |
-| **RTC HAT with a battery (e.g. DS3231)**, if the Pi will have no network | Without network time the Pi's clock is wrong after every reboot (see Clock) |
+| **RTC HAT with a battery (DS3231, e.g. Adafruit 4282 or a "DS3231 RTC for Pi" board)**: **required**, since there is no plant network | Without it the Pi's clock is wrong after every reboot (see Clock) |
 | Metal-free enclosure mounted high, with line of sight to the machines | BLE does not pass through machine guarding well |
 
 **Placement:** one Pi per area of about 6–10 machines. Before committing,
@@ -152,14 +152,31 @@ A Raspberry Pi **has no battery-backed clock**. After a reboot without network
 access it can be hours or days off, and pushing that to the devices would
 corrupt every record.
 
-So by default (`set_device_clock = "ntp"`) the gateway only sets device
-clocks while the Pi reports `NTPSynchronized=yes`. Otherwise it leaves them
-alone; their own DS3231 RTCs keep good time for months.
+**This plant has no network, so the Pi keeps time with an RTC HAT** and the
+config uses `set_device_clock = "always"`. One-time setup:
 
-* **Pi on the plant network:** NTP works out of the box (point it at the
-  plant's NTP server in `/etc/systemd/timesyncd.conf` if the internet is blocked).
-* **Pi with no network:** fit an RTC HAT, set its time once, and set
-  `set_device_clock = "always"`.
+```bash
+# 1. Enable the RTC: add this line to /boot/firmware/config.txt, then reboot
+dtoverlay=i2c-rtc,ds3231
+
+# 2. Stop the "fake hardware clock" that restores the last shutdown time
+sudo apt purge -y fake-hwclock
+
+# 3. Set the time once. From a laptop with correct time, over SSH (see "Getting
+#    the data off"), run:
+ssh <your-user>@csw-gw1.local "sudo date -u -s @$(date -u +%s) && sudo hwclock -w"
+
+# 4. Check: should match a phone's clock to the second
+sudo hwclock -r; date
+```
+
+From then on the Pi reads the RTC at boot, and the RTC drifts about one
+minute a year. Check it against a phone every few months (the `devices`
+command and the bench client show the device clock too), and repeat step 3
+if it is more than a few seconds off.
+
+If a site does have a network later, `set_device_clock = "ntp"` makes the
+gateway set device clocks only while the Pi is NTP-synchronized.
 
 ## Storage and backups
 
@@ -169,13 +186,29 @@ alone; their own DS3231 RTCs keep good time for months.
 * Back up by copying the file with SQLite's own command (safe while running):
   `sqlite3 /var/lib/csw/csw.sqlite ".backup /mnt/usb/csw-$(date +%F).sqlite"`
 
-## Network and IT
+## Getting the data off (no plant network)
 
-The gateway **does not need a network to collect data**. With an RTC HAT
-it works fully offline, and you fetch the database with a USB stick or over
-SSH. Putting it on the plant network (for NTP, remote SQL access or a
-dashboard) is an IT/OT decision. See section D of
-[the sign-off checklist](../docs/plant-signoff-checklist.md).
+The gateway runs fully offline. To get the data:
+
+* **USB stick:** plug it into the Pi and run
+  ```bash
+  sudo mount /dev/sda1 /mnt
+  sqlite3 /var/lib/csw/csw.sqlite ".backup /mnt/csw-$(date +%F).sqlite"
+  python /opt/csw/gateway/csw_gateway.py --config /etc/csw/gateway.toml export --days 31 --csv /mnt/intervals-$(date +%F).csv
+  sudo umount /mnt
+  ```
+  Then open the `.sqlite` file on your PC with *DB Browser for SQLite*, or
+  the CSV in Excel.
+* **Laptop with an Ethernet cable**, plugged straight into the Pi (no switch,
+  no plant network). Raspberry Pi OS answers at `<hostname>.local`, so
+  `ssh <your-user>@csw-gw1.local` and `scp` work (set the hostname to e.g. `csw-gw1` in Raspberry Pi Imager). This is also how you set the clock
+  and run reports.
+
+Both keep the Pi off every network. Check with IT whether even a
+point-to-point cable or a Pi Wi-Fi hotspot needs approval; the
+[sign-off checklist](../docs/plant-signoff-checklist.md) section D covers it.
+Turn the Pi's own Wi-Fi off (`sudo nmcli radio wifi off`) so it cannot join
+anything by accident; Bluetooth is separate and keeps working.
 
 ## Tests
 

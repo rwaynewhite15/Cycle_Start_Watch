@@ -20,7 +20,7 @@ an approved model only need the per-machine items (section F).
 
 | # | Item | Who | Done |
 |---|---|---|---|
-| A1 | Design review of the input circuit: parallel tap, current-limited (< 10 mA normal, < 20 mA single fault), fused at the tap, no outputs. See [hardware/README.md](../hardware/README.md) | Controls engineer | |
+| A1 | Design review of the input circuit: parallel tap, current-limited (< 10 mA normal, < 20 mA single fault), fused at the tap, no outputs. See [hardware/README.md](https://github.com/rwaynewhite15/Cycle_Start_Watch/blob/main/hardware/README.md) | Controls engineer | |
 | A2 | Confirmed: no ladder, PMC, parameter or program changes | Controls engineer | |
 | A3 | Survey done for each machine model; lamp behaviour table on file (install guide step 1) | Controls engineer | |
 | A4 | Load on the PMC output (+7 mA) is within its rating | Controls engineer | |
