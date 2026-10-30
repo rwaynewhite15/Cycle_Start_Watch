@@ -1,0 +1,37 @@
+# Copy to gateway.toml and edit.
+
+database = "/var/lib/csw/csw.sqlite"   # on a USB SSD if you can; see README "Storage"
+interval_s = 300                       # how often to sync every device
+scan_s = 10
+connect_timeout_s = 20
+
+# Set device clocks from the Pi only when the Pi is NTP-synchronized.
+# "always" if you fitted an RTC HAT and trust it; "never" to leave device clocks alone.
+set_device_clock = "ntp"
+
+# Empty = collect every Cycle Start Watch in range (fine for a pilot).
+# For production list the MAC addresses, so a unit from another area is ignored.
+devices = [
+  # "AA:BB:CC:DD:EE:01",   # OKUMA-LB-07
+]
+
+# Local time zone for shift reports. Storage is always UTC.
+timezone = "America/Detroit"
+
+[[shifts]]
+name = "A"
+start = "06:00"
+end = "14:30"
+days = ["mon", "tue", "wed", "thu", "fri"]
+
+[[shifts]]
+name = "B"
+start = "14:30"
+end = "23:00"
+days = ["mon", "tue", "wed", "thu", "fri"]
+
+[[shifts]]
+name = "C"
+start = "23:00"
+end = "06:00"                            # ends the next morning
+days = ["sun", "mon", "tue", "wed", "thu"]

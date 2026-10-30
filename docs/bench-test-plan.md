@@ -96,9 +96,24 @@ Use `python tools/csw_client.py watch --device CSW-xxxx`, or just the serial log
 | F4 | Range test: device inside a closed steel box (a stand-in for the cabinet), then outside it | Note the RSSI and the distance at which the connection drops, for each case | |
 | F5 | Fill test (optional, slow): set `settle_ms` 200 and drive 1 Hz for about 10 h to pass 32,768 records | first_seq advances; a download from 1 starts at first_seq; nothing breaks at the wrap | |
 
+## G. Raspberry Pi gateway
+
+Set up the Pi as described in [gateway/README.md](../gateway/README.md) and
+pair it with the bench device.
+
+| # | Step | Expected | Result |
+|---|---|---|---|
+| G1 | `csw_gateway.py once -v` | Device found with RSSI; all records downloaded; `devices` shows it | |
+| G2 | Run the service for 1 h while flipping the switch now and then | Each pass logs "N new records"; `event` table matches the serial log | |
+| G3 | Connect with nRF Connect between passes | Phone connects; the gateway's next pass still succeeds | |
+| G4 | Unplug the bench device for 2 passes | `sync_log` shows "not seen in this scan"; nothing breaks; the next pass catches up | |
+| G5 | Unpair (BOOT held 5 s), run a pass | Fails with "is this device paired"; after re-pairing, it catches up with no gaps | |
+| G6 | Pi offline (Wi-Fi off) and rebooted, no RTC HAT | Gateway does **not** set the device clock (`set_device_clock = "ntp"`) | |
+| G7 | `report --days 1` after the F2 soak test | In-cycle % matches the timer's duty cycle within 0.5% | |
+
 ## Pass criteria before going near a machine
 
-* All of A–E pass. F1–F3 pass.
+* All of A–E pass. F1–F3 pass. G1–G6 pass if you are using the gateway.
 * F2 soak: in-cycle % from the downloaded log is within 0.5% of the duty
   cycle of the timer.
 * You know the BLE range through a steel enclosure (F4). This decides where

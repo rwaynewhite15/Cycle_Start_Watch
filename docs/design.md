@@ -180,7 +180,27 @@ loss on the list.
   connector), not a bare chip. The modules carry FCC/IC/CE radio approval,
   which plant EHS or IT may ask for.
 
-## 8. App (planned)
+## 8. Raspberry Pi gateway (chosen as the main data path)
+
+Phone-only sync has two problems: data arrives only when someone walks the
+floor, and a busy machine's log wraps after about 11 days. A Raspberry Pi
+per area syncs every device in range every 5 minutes into SQLite. See
+[gateway/README.md](../gateway/README.md).
+
+* **Python + `bleak`**, the same library as the bench client, so the sync
+  logic is tested once and reused. SQLite because the data is small (about
+  1 MB per machine per year) and you can query it directly.
+* **One connection at a time, a few seconds each.** The device only accepts
+  one client, so a phone still gets in between passes.
+* **The Pi only sets device clocks when its own clock is NTP-synced.** A Pi
+  has no battery clock. After an offline reboot it could otherwise push a
+  wrong time to every device. Offline sites fit an RTC HAT.
+* **No network required to collect.** Network access (for NTP, remote
+  queries or a dashboard) is a separate IT/OT decision.
+* **Pairing:** each device is paired with the Pi once, with `bluetoothctl`
+  and the passkey from its label.
+
+## 9. App (planned)
 
 * **Flutter**: one codebase for iOS and Android. BLE through
   `flutter_blue_plus` (widely used, handles iOS and Android pairing
@@ -190,18 +210,19 @@ loss on the list.
 * The schema and an example in-cycle-by-shift query are in
   [app/README.md](../app/README.md).
 
-## 9. Open risks
+## 10. Open risks
 
 | Risk | Mitigation |
 |---|---|
 | A lamp behaves differently from STL on some model | Survey every model; BLINK state; `invert` option; stack light fallback |
 | No lamp terminals on the panel | Stack light, or an existing PMC output |
 | Steel cabinet blocks BLE | Device mounted outside the cabinet; external-antenna module variant |
-| Nobody syncs, so the ring buffer wraps and data is lost | Sync reminders in the app; plan a fixed gateway |
+| Nobody syncs, so the ring buffer wraps and data is lost | Raspberry Pi gateway syncs every 5 minutes; `sync_log` flags any loss |
+| Gateway out of BLE range of some machines | Range check with `csw_gateway.py once -v` before placing; USB adapter with external antenna |
 | Plant wireless policy forbids BLE devices | Raise it early (sign-off checklist) |
 | Machine warranty or builder concerns about added wiring | Parallel tap only, documented, reversible; ask the builder if under warranty |
 
-## 10. Phase 2: why the program, N number, tool and alarm need a data link
+## 11. Phase 2: why the program, N number, tool and alarm need a data link
 
 The lamp is one bit. Program number, N number, tool and alarm number live
 inside the CNC, so they need a data connection, not more wiring.
@@ -219,7 +240,7 @@ inside the CNC, so they need a data connection, not more wiring.
   Check before paying for FOCAS work.
 * **Network policy.** Putting a device on the machine's network is an OT
   security conversation. Start it during phase 1.
-* **Two things worth deciding early:** (a) once a Pi with FOCAS reads the
-  run state directly, the lamp device on that machine becomes a backup, as
-  planned; (b) the same Pi can act as a **BLE-to-network gateway** for the
-  lamp devices around it. That fixes the "someone has to walk past" gap.
+* **The gateway Pi is the natural host for FOCAS/MTConnect.** Phase 2 adds
+  tables next to `event` in the same database. Once a Pi reads the run state
+  directly from a control, the lamp device on that machine becomes the
+  backup, as planned.

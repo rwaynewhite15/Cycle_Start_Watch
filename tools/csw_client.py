@@ -97,7 +97,7 @@ async def cmd_download(args):
             await c.write_gatt_char(p.CHR_CURSOR, struct.pack("<I", seq), response=True)
             page = p.parse_page(await c.read_gatt_char(p.CHR_PAGE))
             events += page
-            if len(page) < 32:
+            if len(page) < p.PAGE_RECORDS:
                 break
             seq = page[-1].seq + 1
     for e in events:

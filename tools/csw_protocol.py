@@ -25,6 +25,7 @@ STF_TIME_VALID, STF_RTC_PRESENT, STF_LOG_ERROR = 0x01, 0x02, 0x04
 _RECORD = struct.Struct("<IIHBBI")  # seq, ts, ms, type, flags, value
 _STATUS = struct.Struct("<BBBBIIII")  # protocol, state, input, flags, now, since, first, next
 RECORD_SIZE = _RECORD.size  # 16
+PAGE_RECORDS = 32  # a full log page; fewer means the download has caught up
 
 
 def utc(ts: int, ms: int = 0) -> datetime:

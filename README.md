@@ -1,16 +1,18 @@
 # Cycle Start Watch
 
 A small Bluetooth device that watches a CNC machine's **cycle start lamp** and
-logs when the machine is in cycle. A phone app downloads the log and shows
-in-cycle time by shift, the longest stops, and a CSV export.
+logs when the machine is in cycle. A **Raspberry Pi gateway** collects every
+device's log into a SQLite database automatically, and reports in-cycle time
+by shift, the longest stops, and a CSV export. A phone app can also connect
+to a device directly, for setup and spot checks.
 
 Target machines: Fanuc, Okuma and Mori Seiki CNCs in a gear and transmission
 machining plant.
 
-> **Status:** phase 1. The firmware is written, and the input filter has unit
-> tests that pass. The full ESP32 build runs in CI
-> (`.github/workflows/firmware.yml`). The bench test is next. The app is not
-> started yet.
+> **Status:** phase 1. The firmware builds for the ESP32-C3 and -S3 in CI,
+> and its input filter has unit tests that pass. The Raspberry Pi gateway is
+> written and tested against a simulated device. Next: the bench test on real
+> hardware. The phone app is not started yet.
 
 ## Hard requirements
 
@@ -27,10 +29,10 @@ machining plant.
 ```
  Machine cabinet                         Device (outside the cabinet)        Phone
  ───────────────                         ────────────────────────────        ─────
- Cycle start lamp ──(fused tap)──▶ PC814 optocoupler ─▶ ESP32 ─── BLE ───▶ App
- 24 VDC control supply ─(fused tap)──▶ isolated DC-DC ─┘   │                 │
-                                                   DS3231 RTC            SQLite
-                                                   + coin cell         reports, CSV
+ Cycle start lamp ──(fused tap)──▶ PC814 optocoupler ─▶ ESP32 ─── BLE ───▶ Raspberry Pi gateway
+ 24 VDC control supply ─(fused tap)──▶ isolated DC-DC ─┘   │          │       SQLite, shift reports, CSV
+                                                   DS3231 RTC     └─▶ Phone app (setup, spot checks)
+                                                   + coin cell
 ```
 
 * **What is sensed:** the cycle start button's *lamp*, not its contacts. On
@@ -57,6 +59,7 @@ machining plant.
 |---|---|
 | [`firmware/`](firmware/) | PlatformIO project. `pio run -e esp32c3` builds it, `pio test -e native` runs the PC unit tests |
 | [`hardware/`](hardware/README.md) | Schematic, parts list and the component-value calculations |
+| [`gateway/`](gateway/README.md) | Raspberry Pi gateway: BLE → SQLite collector, shift reports, CSV export |
 | [`app/`](app/README.md) | Flutter app (plan and database schema so far) |
 | [`tools/`](tools/) | Python bench client (`csw_client.py`, uses `bleak`) and protocol decoder |
 | [`docs/design.md`](docs/design.md) | Why each decision was made, open risks, phase 2 |
@@ -96,7 +99,7 @@ The full reasoning is in [docs/design.md](docs/design.md).
 * **Call the metric "in-cycle %", not "uptime" or "availability".** It is not
   OEE availability: it does not know planned downtime reasons or part counts.
   The new name avoids an argument with the plant's OEE numbers.
-* **Data only reaches the app when someone walks past with a phone.** The log
-  holds about 11 days at a busy machine. If you need daily reports without
-  walking the floor, plan a fixed BLE gateway. The phase 2 Raspberry Pi could
-  do that.
+* **A Raspberry Pi gateway collects the data, instead of relying on someone
+  walking past with a phone.** Each device's log holds only about 11 days
+  at a busy machine. The gateway syncs every device in range every 5 minutes.
+  The same Pi is the natural home for phase 2 (FOCAS/MTConnect).
